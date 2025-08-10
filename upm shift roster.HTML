@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shift Roster - Dynamic with Filter</title>
+<link rel="icon" type="image/png" href="https://cdn4.iconfinder.com/data/icons/staff-management-soft/512/duty-512.png">
+<style>
+    body { 
+        font-family: Arial, sans-serif; 
+        margin: 20px; 
+        background: linear-gradient(135deg, #f0f4ff, #d0e6ff, #f0f4ff);
+        background-attachment: fixed;
+    }
+    h2 {
+        text-align: center;
+        color: #003366;
+        margin-bottom: 20px;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    }
+    table { 
+        border-collapse: collapse; 
+        width: 100%; 
+        margin-bottom: 30px; 
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    th, td { 
+        border: 1px solid #444; 
+        padding: 6px; 
+        text-align: center; 
+        font-size: 13px;
+    }
+    th { 
+        background-color: #f4f4f4; 
+    }
+    caption { 
+        font-size: 1.5em; 
+        font-weight: bold; 
+        margin-bottom: 10px; 
+        color: #003366;
+    }
+    .week-off { background-color: #ffd6d6; font-weight: bold; }
+    .morning { background-color: #d6f5d6; }
+    .evening { background-color: #d6e0f5; }
+    .night { background-color: #f5f5d6; }
+    .general { background-color: #d6f5f5; }
+    .late-evening { background-color: #f0d6f5; }
+    tr:hover { background-color: #f0f0f0; }
+    .legend { 
+        margin-bottom: 15px; 
+        background: rgba(255,255,255,0.8); 
+        padding: 10px; 
+        border-radius: 6px; 
+        display: inline-block;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .legend span { 
+        padding: 5px 10px; 
+        border-radius: 5px; 
+        margin-right: 10px; 
+        display: inline-block; 
+    }
+    label, select, button {
+        font-size: 14px;
+        margin: 5px;
+    }
+    button {
+        padding: 5px 10px;
+        background: #003366;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    button:hover {
+        background: #0055aa;
+    }
+    .weekend-header {
+        background-color: #ffe5b4 !important;
+    }
+</style>
+</head>
+<body>
+
+<h2>UPM Shift Roster</h2>
+
+<!-- Filters -->
+<label for="dayFilter"><strong>Filter by Day:</strong></label>
+<select id="dayFilter">
+    <option value="all">All</option>
+</select>
+
+<label for="filterSelect"><strong>Filter by Employee:</strong></label>
+<select id="filterSelect">
+    <option value="all">All</option>
+</select>
+
+<label for="shiftFilter"><strong>Filter by Shift:</strong></label>
+<select id="shiftFilter">
+    <option value="all">All</option>
+    <option value="morning">Morning (6:00 - 3:30)</option>
+    <option value="evening">Evening (3:30 - 1:00)</option>
+    <option value="night">Night (1:30 - 11:00)</option>
+    <option value="general">General (9:00 - 6:30)</option>
+    <option value="late-evening">Late Evening (13:23 - 23:00)</option>
+</select>
+
+<button onclick="resetFilter()">Reset</button>
+
+<!-- Legend -->
+<div class="legend">
+    <span class="morning">Morning (6:00 - 3:30)</span>
+    <span class="evening">Evening (3:30 - 1:00)</span>
+    <span class="night">Night (1:30 - 11:00)</span>
+    <span class="general">General (9:00 - 6:30)</span>
+    <span class="late-evening">Late Evening (13:23 - 23:00)</span>
+    <span class="week-off">Week Off</span>
+</div>
+
+<!-- Main Shift Table -->
+<table id="shiftTable">
+    <caption id="tableCaption"></caption>
+    <thead id="shiftHead"></thead>
+    <tbody id="shiftBody"></tbody>
+</table>
+
+<!-- On-call Night Filter -->
+<label for="nightDateFilter"><strong>Filter Night On-call by Date:</strong></label>
+<select id="nightDateFilter">
+    <option value="all">All</option>
+</select>
+<button onclick="resetNightFilter()">Reset</button>
+
+<!-- On-call Night Table -->
+<table id="onCallNight">
+    <caption>On-call Support - Night</caption>
+    <thead><tr><th>Date</th><th>Resource</th><th>Contact</th></tr></thead>
+    <tbody></tbody>
+</table>
+
+<!-- On-call Sunday Filter -->
+<label for="sundayDateFilter"><strong>Filter Sunday On-call by Date:</strong></label>
+<select id="sundayDateFilter">
+    <option value="all">All</option>
+</select>
+<button onclick="resetSundayFilter()">Reset</button>
+
+<!-- On-call Sunday Table -->
+<table id="onCallSunday">
+    <caption>On-call Support - Sunday</caption>
+    <thead><tr><th>Date</th><th>Resource</th><th>Contact</th></tr></thead>
+    <tbody></tbody>
+</table>
+
+<script>
+const month = 8; // September (0-indexed)
+const year = 2025;
+const monthName = new Date(year, month).toLocaleString('default', { month: 'long' });
+
+const employees = [
+    { name: "Rakesh", id: "XXXXX000", shifts: [
+        "week-off","morning","morning","morning","morning","morning",
+        "week-off","week-off","evening","evening","evening","evening","night",
+        "week-off","week-off","morning","morning","morning","morning","morning",
+        "week-off","week-off","evening","evening","evening","evening","night",
+        "week-off","week-off","morning"
+    ]},
+    { name: "Anandhi", id: "XXXXX719", shifts: [
+        "week-off","evening","evening","evening","evening","night",
+        "week-off","week-off","morning","morning","morning","morning","morning",
+        "week-off","week-off","evening","evening","evening","evening","night",
+        "week-off","week-off","morning","morning","morning","morning","morning",
+        "week-off","week-off","evening"
+    ]},
+    { name: "Abinaya", id: "XXXXX079", shifts: [
+        "9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","week-off","week-off",
+        "9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","week-off","week-off",
+        "9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","week-off","week-off",
+        "9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","9:00 - 6:30","week-off","week-off",
+        "9:00 - 6:30","9:00 - 6:30"
+    ]},
+    { name: "Vijay", id: "XXXXX473", shifts: [
+        "13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","week-off","week-off",
+        "13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","week-off","week-off",
+        "13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","week-off","week-off",
+        "13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","13:23 - 23:00","week-off","week-off",
+        "13:23 - 23:00","13:23 - 23:00"
+    ]}
+];
+
+const nightOnCall = [
+    { date: "01 - 05 September", name: "Anandhi", contact: "XXXXXXX464" },
+    { date: "08 - 12 September", name: "Rakesh", contact: "XXXXXXX847" },
+    { date: "15 - 19 September", name: "Vijay", contact: "XXXXXXX668" },
+    { date: "22 - 26 September", name: "Rakesh", contact: "XXXXXXX847" },
+    { date: "29 - 30 September", name: "Anandhi", contact: "XXXXXXX464" }
+];
+
+const sundayOnCall = [
+    { date: "07 September", name: "Rakesh", contact: "XXXXXXX847" },
+    { date: "14 September", name: "Anandhi", contact: "XXXXXXX464" },
+    { date: "21 September", name: "Abinaya", contact: "XXXXXXX311" },
+    { date: "28 September", name: "Rakesh", contact: "XXXXXXX847" }
+];
+
+// Populate Employee Filter
+employees.forEach(emp => {
+    const opt = document.createElement("option");
+    opt.value = emp.name;
+    opt.textContent = emp.name;
+    document.getElementById("filterSelect").appendChild(opt);
+});
+
+// Generate table header
+const daysInMonth = new Date(year, month + 1, 0).getDate();
+document.getElementById("tableCaption").innerText = `${monthName} ${year}`;
+
+function generateHeader(dayFilter = "all") {
+    let headRow = `<tr><th>Name</th><th>SAP ID</th>`;
+    for (let i = 1; i <= daysInMonth; i++) {
+        if (dayFilter !== "all" && i !== parseInt(dayFilter)) continue;
+        let dateObj = new Date(year, month, i);
+        let dayName = dateObj.toLocaleString('default', { weekday: 'short' });
+        let weekendClass = (dayName === "Sat" || dayName === "Sun") ? "weekend-header" : "";
+        headRow += `<th class="${weekendClass}">${dayName}<br>${monthName.substring(0,3)}-${i.toString().padStart(2,'0')}</th>`;
+    }
+    headRow += "</tr>";
+    document.getElementById("shiftHead").innerHTML = headRow;
+}
+
+// Populate Day Filter
+const daySelect = document.getElementById("dayFilter");
+for (let i = 1; i <= daysInMonth; i++) {
+    let dateObj = new Date(year, month, i);
+    let dayName = dateObj.toLocaleString('default', { weekday: 'short' });
+    let opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${dayName} - ${monthName.substring(0,3)}-${i.toString().padStart(2,'0')}`;
+    daySelect.appendChild(opt);
+}
+
+// Render Shift Table
+function renderTable(empFilter = "all", shiftFilter = "all", dayFilter = "all") {
+    generateHeader(dayFilter);
+    let html = "";
+    employees.forEach(emp => {
+        if (empFilter !== "all" && emp.name !== empFilter) return;
+        html += `<tr><td>${emp.name}</td><td>${emp.id}</td>`;
+        emp.shifts.forEach((shift, index) => {
+            if (dayFilter !== "all" && index + 1 !== parseInt(dayFilter)) return;
+            let cls = "";
+            let displayShift = shift;
+
+            if (shift.toLowerCase() === "week-off") {
+                cls = "week-off";
+            } else if (shift === "morning") {
+                displayShift = "6:00 - 3:30"; cls = "morning";
+            } else if (shift === "evening") {
+                displayShift = "3:30 - 1:00"; cls = "evening";
+            } else if (shift === "night") {
+                displayShift = "1:30 - 11:00"; cls = "night";
+            } else if (shift === "9:00 - 6:30") {
+                cls = "general";
+            } else if (shift === "13:23 - 23:00") {
+                cls = "late-evening";
+            }
+
+            if (shiftFilter !== "all" && cls !== shiftFilter) {
+                html += `<td></td>`;
+            } else {
+                html += `<td class="${cls}">${displayShift}</td>`;
+            }
+        });
+        html += "</tr>";
+    });
+    document.getElementById("shiftBody").innerHTML = html;
+}
+renderTable();
+
+// Filters for Shift Table
+document.getElementById("filterSelect").addEventListener("change", function() {
+    renderTable(this.value, document.getElementById("shiftFilter").value, document.getElementById("dayFilter").value);
+});
+document.getElementById("shiftFilter").addEventListener("change", function() {
+    renderTable(document.getElementById("filterSelect").value, this.value, document.getElementById("dayFilter").value);
+});
+document.getElementById("dayFilter").addEventListener("change", function() {
+    renderTable(document.getElementById("filterSelect").value, document.getElementById("shiftFilter").value, this.value);
+});
+function resetFilter() {
+    document.getElementById("filterSelect").value = "all";
+    document.getElementById("shiftFilter").value = "all";
+    document.getElementById("dayFilter").value = "all";
+    renderTable();
+}
+
+// Populate Night On-call Date Filter
+const nightDateSelect = document.getElementById("nightDateFilter");
+nightOnCall.forEach(item => {
+    let opt = document.createElement("option");
+    opt.value = item.date;
+    opt.textContent = item.date;
+    nightDateSelect.appendChild(opt);
+});
+
+// Render Night On-call Table
+function renderNightOnCall(dateFilter = "all") {
+    let html = "";
+    nightOnCall.forEach(row => {
+        if (dateFilter !== "all" && row.date !== dateFilter) return;
+        html += `<tr><td>${row.date}</td><td>${row.name}</td><td><a href="tel:+91${row.contact}">${row.contact}</a></td></tr>`;
+    });
+    document.querySelector("#onCallNight tbody").innerHTML = html;
+}
+renderNightOnCall();
+
+// Night On-call Filter Event
+nightDateSelect.addEventListener("change", function() {
+    renderNightOnCall(this.value);
+});
+function resetNightFilter() {
+    nightDateSelect.value = "all";
+    renderNightOnCall();
+}
+
+// Populate Sunday On-call Date Filter
+const sundayDateSelect = document.getElementById("sundayDateFilter");
+sundayOnCall.forEach(item => {
+    let opt = document.createElement("option");
+    opt.value = item.date;
+    opt.textContent = item.date;
+    sundayDateSelect.appendChild(opt);
+});
+
+// Render Sunday On-call Table
+function renderSundayOnCall(dateFilter = "all") {
+    let html = "";
+    sundayOnCall.forEach(row => {
+        if (dateFilter !== "all" && row.date !== dateFilter) return;
+        html += `<tr><td>${row.date}</td><td>${row.name}</td><td><a href="tel:+91${row.contact}">${row.contact}</a></td></tr>`;
+    });
+    document.querySelector("#onCallSunday tbody").innerHTML = html;
+}
+renderSundayOnCall();
+
+// Sunday On-call Filter Event
+sundayDateSelect.addEventListener("change", function() {
+    renderSundayOnCall(this.value);
+});
+function resetSundayFilter() {
+    sundayDateSelect.value = "all";
+    renderSundayOnCall();
+}
+</script>
+
+</body>
+</html>
